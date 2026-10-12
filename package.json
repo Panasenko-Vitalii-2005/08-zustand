@@ -1,5 +1,5 @@
 {
-  "name": "06-notehub-nextjs",
+  "name": "07-routing-nextjs",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -26,6 +26,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "prettier": "^3.9.10",
     "typescript": "^5"
   }
 }

@@ -1,25 +1,25 @@
 "use client";
 
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
-import { deleteNote, fetchNotes } from "@/lib/api";
+import { deleteNote } from "@/lib/api";
+import { notesQueryOptions } from "@/lib/notes-query";
+import type { NoteTag } from "@/types/note";
 import Modal from "@/components/Modal/Modal";
 import NoteForm from "@/components/NoteForm/NoteForm";
 import NoteList from "@/components/NoteList/NoteList";
 import Pagination from "@/components/Pagination/Pagination";
 import SearchBox from "@/components/SearchBox/SearchBox";
-import css from "./Notes.module.css";
+import css from "./NotesPage.module.css";
 
-const NOTES_PER_PAGE = 12;
 const SEARCH_DELAY = 300;
 
-export default function NotesClient() {
+interface NotesClientProps {
+  tag?: NoteTag;
+}
+
+export default function NotesClient({ tag }: NotesClientProps) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -37,20 +37,18 @@ export default function NotesClient() {
   };
 
   const { data, isError, isFetching, isLoading } = useQuery({
-    queryKey: ["notes", page, search],
-    queryFn: () =>
-      fetchNotes({
-        page,
-        perPage: NOTES_PER_PAGE,
-        search: search || undefined,
-      }),
-    placeholderData: keepPreviousData,
+    ...notesQueryOptions(page, search, tag),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[4] === (tag ?? null) ? previousData : undefined,
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteNote,
     onSuccess: async (deletedNote) => {
-      queryClient.removeQueries({ queryKey: ["note", deletedNote.id], exact: true });
+      queryClient.removeQueries({
+        queryKey: ["note", deletedNote.id],
+        exact: true,
+      });
       if (
         page > 1 &&
         data?.notes.length === 1 &&
@@ -91,8 +89,13 @@ export default function NotesClient() {
         <NoteList
           notes={data.notes}
           onDelete={(id) => deleteMutation.mutate(id)}
-          deletingNoteId={deleteMutation.isPending ? deleteMutation.variables : undefined}
+          deletingNoteId={
+            deleteMutation.isPending ? deleteMutation.variables : undefined
+          }
         />
+      )}
+      {data && data.notes.length === 0 && !isFetching && !isError && (
+        <p>No notes found.</p>
       )}
       {isModalOpen && (
         <Modal onClose={() => setIsModalOpen(false)}>

@@ -8,16 +8,23 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "NoteHub",
-  description: "Keep your personal notes organized and accessible with NoteHub.",
+  description:
+    "Keep your personal notes organized and accessible with NoteHub.",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+interface RootLayoutProps {
+  children: ReactNode;
+  modal: ReactNode;
+}
+
+export default function RootLayout({ children, modal }: RootLayoutProps) {
   return (
     <html lang="en">
       <body>
         <TanStackProvider>
           <Header />
           {children}
+          {modal}
           <Footer />
         </TanStackProvider>
       </body>

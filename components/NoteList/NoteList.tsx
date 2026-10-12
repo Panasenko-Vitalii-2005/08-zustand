@@ -10,7 +10,11 @@ interface NoteListProps {
   deletingNoteId?: string;
 }
 
-export default function NoteList({ notes, onDelete, deletingNoteId }: NoteListProps) {
+export default function NoteList({
+  notes,
+  onDelete,
+  deletingNoteId,
+}: NoteListProps) {
   return (
     <ul className={css.list}>
       {notes.map((note) => (
@@ -19,7 +23,11 @@ export default function NoteList({ notes, onDelete, deletingNoteId }: NoteListPr
           <p className={css.content}>{note.content}</p>
           <div className={css.footer}>
             <span className={css.tag}>{note.tag}</span>
-            <Link className={css.link} href={`/notes/${note.id}`}>
+            <Link
+              className={css.link}
+              href={`/notes/${note.id}`}
+              scroll={false}
+            >
               View details
             </Link>
             <button

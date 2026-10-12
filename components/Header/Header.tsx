@@ -4,14 +4,20 @@ import css from "./Header.module.css";
 export default function Header() {
   return (
     <header className={css.header}>
-      <Link href="/">NoteHub</Link>
+      <Link href="/" className={css.headerLink}>
+        NoteHub
+      </Link>
       <nav aria-label="Main navigation">
         <ul className={css.navigation}>
-          <li>
-            <Link href="/">Home</Link>
+          <li className={css.navigationItem}>
+            <Link href="/" className={css.navigationLink}>
+              Home
+            </Link>
           </li>
-          <li>
-            <Link href="/notes">Notes</Link>
+          <li className={css.navigationItem}>
+            <Link href="/notes/filter/all" className={css.navigationLink}>
+              Notes
+            </Link>
           </li>
         </ul>
       </nav>
