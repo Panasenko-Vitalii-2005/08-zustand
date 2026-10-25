@@ -32,11 +32,9 @@ export default function NotesClient({ tag }: NotesClientProps) {
     updateSearch(value);
   };
 
-  const { data, isError, isFetching, isLoading } = useQuery({
-    ...notesQueryOptions(page, search, tag),
-    placeholderData: (previousData, previousQuery) =>
-      previousQuery?.queryKey[4] === (tag ?? null) ? previousData : undefined,
-  });
+  const { data, isError, isFetching, isLoading } = useQuery(
+    notesQueryOptions(page, search, tag),
+  );
 
   return (
     <main className={css.app}>
