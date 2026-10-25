@@ -3,7 +3,8 @@ import {
   HydrationBoundary,
   QueryClient,
 } from "@tanstack/react-query";
-import { fetchNoteById } from "@/lib/api";
+import { fetchNoteForPage } from "@/lib/api/server";
+export { generateMetadata } from "@/app/notes/[id]/page";
 import NotePreviewClient from "./NotePreview.client";
 
 interface NotePreviewProps {
@@ -17,7 +18,7 @@ export default async function NotePreview({ params }: NotePreviewProps) {
 
   await queryClient.prefetchQuery({
     queryKey,
-    queryFn: () => fetchNoteById(id),
+    queryFn: () => fetchNoteForPage(id),
   });
   const error = queryClient.getQueryState(queryKey)?.error;
   if (error) throw error;

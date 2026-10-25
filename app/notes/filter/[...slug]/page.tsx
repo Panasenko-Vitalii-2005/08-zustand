@@ -3,29 +3,43 @@ import {
   HydrationBoundary,
   QueryClient,
 } from "@tanstack/react-query";
-import { connection } from "next/server";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { notesQueryOptions } from "@/lib/notes-query";
-import type { NoteTag } from "@/types/note";
+import { createPageMetadata } from "@/lib/metadata";
+import { isNoteTag } from "@/types/note";
 import NotesClient from "./Notes.client";
 
 interface NotesPageProps {
   params: Promise<{ slug: string[] }>;
 }
 
-function isNoteTag(value: string): value is NoteTag {
-  return ["Todo", "Work", "Personal", "Meeting", "Shopping"].includes(value);
+async function resolveFilter(params: NotesPageProps["params"]) {
+  const { slug } = await params;
+  if (slug.length !== 1) notFound();
+  const filter = slug[0];
+  if (filter !== "all" && !isNoteTag(filter)) notFound();
+  return filter;
+}
+
+export async function generateMetadata({
+  params,
+}: NotesPageProps): Promise<Metadata> {
+  const filter = await resolveFilter(params);
+  const category = filter === "all" ? "All" : filter;
+  return createPageMetadata(
+    `${category} notes | NoteHub`,
+    filter === "all"
+      ? "Browse, search and manage all your notes in NoteHub."
+      : `Browse, search and manage your ${filter} notes in NoteHub.`,
+    `/notes/filter/${filter}`,
+  );
 }
 
 export default async function NotesPage({ params }: NotesPageProps) {
-  const { slug } = await params;
-  if (slug.length !== 1) notFound();
-
-  const filter = slug[0];
-  if (filter !== "all" && !isNoteTag(filter)) notFound();
+  const filter = await resolveFilter(params);
   const tag = filter === "all" ? undefined : filter;
 
-  await connection();
   const queryClient = new QueryClient();
   const options = notesQueryOptions(1, "", tag);
   await queryClient.prefetchQuery(options);

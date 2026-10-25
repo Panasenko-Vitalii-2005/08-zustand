@@ -1,13 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
-import { deleteNote } from "@/lib/api";
 import { notesQueryOptions } from "@/lib/notes-query";
 import type { NoteTag } from "@/types/note";
-import Modal from "@/components/Modal/Modal";
-import NoteForm from "@/components/NoteForm/NoteForm";
 import NoteList from "@/components/NoteList/NoteList";
 import Pagination from "@/components/Pagination/Pagination";
 import SearchBox from "@/components/SearchBox/SearchBox";
@@ -20,11 +18,9 @@ interface NotesClientProps {
 }
 
 export default function NotesClient({ tag }: NotesClientProps) {
-  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const updateSearch = useDebouncedCallback((value: string) => {
     setSearch(value.trim());
@@ -42,24 +38,6 @@ export default function NotesClient({ tag }: NotesClientProps) {
       previousQuery?.queryKey[4] === (tag ?? null) ? previousData : undefined,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteNote,
-    onSuccess: async (deletedNote) => {
-      queryClient.removeQueries({
-        queryKey: ["note", deletedNote.id],
-        exact: true,
-      });
-      if (
-        page > 1 &&
-        data?.notes.length === 1 &&
-        data.notes[0].id === deletedNote.id
-      ) {
-        setPage(page - 1);
-      }
-      await queryClient.invalidateQueries({ queryKey: ["notes"] });
-    },
-  });
-
   return (
     <main className={css.app}>
       <header className={css.toolbar}>
@@ -71,36 +49,23 @@ export default function NotesClient({ tag }: NotesClientProps) {
             onPageChange={setPage}
           />
         )}
-        <button
-          className={css.button}
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-        >
+        <Link className={css.button} href="/notes/action/create">
           Create note +
-        </button>
+        </Link>
       </header>
       {isLoading && <p role="status">Loading notes...</p>}
       {isError && <p role="alert">Failed to load notes. Please try again.</p>}
       {isFetching && !isLoading && <p role="status">Updating notes...</p>}
-      {deleteMutation.isError && (
-        <p role="alert">Could not delete note. Please try again.</p>
-      )}
       {data && data.notes.length > 0 && (
         <NoteList
           notes={data.notes}
-          onDelete={(id) => deleteMutation.mutate(id)}
-          deletingNoteId={
-            deleteMutation.isPending ? deleteMutation.variables : undefined
+          onPageEmpty={() =>
+            setPage((currentPage) => Math.max(1, currentPage - 1))
           }
         />
       )}
       {data && data.notes.length === 0 && !isFetching && !isError && (
         <p>No notes found.</p>
-      )}
-      {isModalOpen && (
-        <Modal onClose={() => setIsModalOpen(false)}>
-          <NoteForm onCancel={() => setIsModalOpen(false)} />
-        </Modal>
       )}
     </main>
   );

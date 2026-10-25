@@ -1,126 +1,165 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ErrorMessage, Field, Form, Formik } from "formik";
-import * as Yup from "yup";
-import { createNote, type CreateNoteParams } from "@/lib/api";
-import type { NoteTag } from "@/types/note";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useState } from "react";
+import { createNote } from "@/lib/api";
+import { useNoteStore } from "@/lib/store/noteStore";
+import { isNoteTag, noteTags } from "@/types/note";
 import css from "./NoteForm.module.css";
 
-interface NoteFormProps {
-  onCancel: () => void;
+interface FormState {
+  error: string;
+  attempt: number;
 }
 
-const noteTags: NoteTag[] = ["Todo", "Work", "Personal", "Meeting", "Shopping"];
-
-const initialValues: CreateNoteParams = {
-  title: "",
-  content: "",
-  tag: "Todo",
-};
-
-const validationSchema: Yup.ObjectSchema<CreateNoteParams> = Yup.object({
-  title: Yup.string()
-    .min(3, "Title must be at least 3 characters")
-    .max(50, "Title must be at most 50 characters")
-    .required("Title is required"),
-  content: Yup.string()
-    .max(500, "Content must be at most 500 characters")
-    .default(""),
-  tag: Yup.mixed<NoteTag>()
-    .oneOf(noteTags, "Select a valid tag")
-    .required("Tag is required"),
-});
-
-function NoteForm({ onCancel }: NoteFormProps) {
+function DraftForm() {
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const draft = useNoteStore((state) => state.draft);
+  const setDraft = useNoteStore((state) => state.setDraft);
+  const clearDraft = useNoteStore((state) => state.clearDraft);
+  const createMutation = useMutation({ mutationFn: createNote });
+  const [state, formAction, isPending] = useActionState<FormState, FormData>(
+    async (previousState, formData) => {
+      const failure = (error: string): FormState => ({
+        error,
+        attempt: previousState.attempt + 1,
+      });
+      const titleValue = formData.get("title");
+      const contentValue = formData.get("content");
+      const tag = formData.get("tag");
+      const title = typeof titleValue === "string" ? titleValue.trim() : "";
+      const content =
+        typeof contentValue === "string" ? contentValue.trim() : "";
 
-  const createMutation = useMutation({
-    mutationFn: createNote,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["notes"] });
-      onCancel();
+      if (title.length < 3 || title.length > 50) {
+        return failure("Title must contain between 3 and 50 characters.");
+      }
+      if (content.length > 500) {
+        return failure("Content must be at most 500 characters.");
+      }
+      if (typeof tag !== "string" || !isNoteTag(tag)) {
+        return failure("Select a valid tag.");
+      }
+
+      try {
+        await createMutation.mutateAsync({ title, content, tag });
+      } catch {
+        return failure(
+          "Could not create note. Please try again. Your draft is saved.",
+        );
+      }
+
+      clearDraft();
+      await queryClient.invalidateQueries({
+        queryKey: ["notes"],
+        refetchType: "all",
+      });
+      router.push("/notes/filter/all");
+      return { error: "", attempt: previousState.attempt + 1 };
     },
-  });
+    { error: "", attempt: 0 },
+  );
 
   return (
-    <Formik
-      initialValues={initialValues}
-      validationSchema={validationSchema}
-      validateOnMount
-      onSubmit={async (values, actions) => {
-        try {
-          await createMutation.mutateAsync(values);
-        } catch {
-          return;
-        } finally {
-          actions.setSubmitting(false);
-        }
-      }}
+    // Remount after a failed action so React's native form reset restores the draft.
+    <form
+      key={state.attempt}
+      action={formAction}
+      className={css.form}
+      aria-busy={isPending}
     >
-      {({ dirty, isSubmitting, isValid }) => (
-        <Form className={css.form}>
-          <div className={css.formGroup}>
-            <label htmlFor="title">Title</label>
-            <Field id="title" type="text" name="title" className={css.input} />
-            <ErrorMessage name="title" component="span" className={css.error} />
-          </div>
+      <div className={css.formGroup}>
+        <label htmlFor="title">Title</label>
+        <input
+          id="title"
+          type="text"
+          name="title"
+          className={css.input}
+          defaultValue={draft.title}
+          onChange={(event) => setDraft({ title: event.target.value })}
+          required
+          minLength={3}
+          maxLength={50}
+          disabled={isPending}
+        />
+      </div>
 
-          <div className={css.formGroup}>
-            <label htmlFor="content">Content</label>
-            <Field
-              id="content"
-              as="textarea"
-              name="content"
-              rows={8}
-              className={css.textarea}
-            />
-            <ErrorMessage
-              name="content"
-              component="span"
-              className={css.error}
-            />
-          </div>
+      <div className={css.formGroup}>
+        <label htmlFor="content">Content</label>
+        <textarea
+          id="content"
+          name="content"
+          rows={8}
+          className={css.textarea}
+          defaultValue={draft.content}
+          onChange={(event) => setDraft({ content: event.target.value })}
+          maxLength={500}
+          disabled={isPending}
+        />
+      </div>
 
-          <div className={css.formGroup}>
-            <label htmlFor="tag">Tag</label>
-            <Field id="tag" as="select" name="tag" className={css.select}>
-              {noteTags.map((tag) => (
-                <option value={tag} key={tag}>
-                  {tag}
-                </option>
-              ))}
-            </Field>
-            <ErrorMessage name="tag" component="span" className={css.error} />
-          </div>
+      <div className={css.formGroup}>
+        <label htmlFor="tag">Tag</label>
+        <select
+          id="tag"
+          name="tag"
+          className={css.select}
+          defaultValue={draft.tag}
+          onChange={(event) => {
+            if (isNoteTag(event.target.value)) {
+              setDraft({ tag: event.target.value });
+            }
+          }}
+          required
+          disabled={isPending}
+        >
+          {noteTags.map((tag) => (
+            <option value={tag} key={tag}>
+              {tag}
+            </option>
+          ))}
+        </select>
+      </div>
 
-          {createMutation.isError && (
-            <p role="alert">Could not create note. Please try again.</p>
-          )}
-
-          <div className={css.actions}>
-            <button
-              type="button"
-              className={css.cancelButton}
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className={css.submitButton}
-              disabled={
-                createMutation.isPending || isSubmitting || !dirty || !isValid
-              }
-            >
-              {createMutation.isPending ? "Creating..." : "Create note"}
-            </button>
-          </div>
-        </Form>
+      {state.error && (
+        <p role="alert" className={css.error}>
+          {state.error}
+        </p>
       )}
-    </Formik>
+
+      <div className={css.actions}>
+        <button
+          type="button"
+          className={css.cancelButton}
+          onClick={() => router.back()}
+          disabled={isPending}
+        >
+          Cancel
+        </button>
+        <button type="submit" className={css.submitButton} disabled={isPending}>
+          {isPending ? "Creating..." : "Create note"}
+        </button>
+      </div>
+    </form>
   );
 }
 
-export default NoteForm;
+export default function NoteForm() {
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    // Wait for localStorage before mounting uncontrolled defaultValue fields.
+    Promise.resolve(useNoteStore.persist.rehydrate()).then(() => {
+      if (active) setIsHydrated(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!isHydrated) return <p role="status">Restoring your draft...</p>;
+  return <DraftForm />;
+}
